@@ -1,0 +1,102 @@
+---
+title: "Sewanee's Birds"
+author: 'Jillian Hall'
+output: flexdashboard::flex_dashboard
+---
+
+```{r}
+################ Loading in packages and Data #######################
+library(readr)
+library(DT)
+library(ggplot2)
+library(dplyr)
+library(leaflet)
+library(tinytable)
+##################### DATA ##################
+#loading in data but not using first row as names 
+birds_data <- read_csv("~/Data & Storytelling/birds_data.csv",
+    col_names = FALSE)
+
+#renaming the columns names 
+birds_data<-birds_data%>%rename('building'=X4,'species'=X2,'identifier'=X3)
+
+#making a vector for buildings
+building<-c('mcclurg','quintard','tennessee ave','snowden','dupont library','fitwell','beihl','mccrady','memorial cross') 
+
+#making a vectors of the latitude of the buildings 
+lat<-c(35.20322,35.19755,35.20028,35.20332,35.20472,35.20286,35.20411,35.20284,35.19232)
+
+#making a vector of the longitude of the buildings
+lng<-c(-85.92029,-85.92522,-85.92205,-85.91758,-85.91785,-85.92076,-85.92134,-85.91811,-85.93706)
+
+#adding all these vectors to gether to make a dataframe 
+locations<-data.frame(building,lat,lng)
+#grouping by building to find out how many birds were seen at each one 
+total_observations<-birds_data%>%
+  group_by(building)%>%
+  summarise(total=n())
+
+#grouping by building then finding the number of unique species are at each one 
+number_species<-birds_data%>%
+  group_by(building)%>%
+  summarise(n_species=n_distinct(species))
+
+#merging the two summaries into one data set by building 
+totals<-merge(total_observations,number_species,by='building')
+
+#then merging this new data set with the lat and lng we created earlier
+totals<-merge(totals,locations,by='building')
+
+#now making a templeate for r to paste into my map as a popup 
+totals$popup_text<-paste0('Location: ', totals$building,'<br/>',
+                          'Birds total: ',totals$total,'<br/>',
+                          'Number of species:',totals$n_species,'<br/>')
+# finding the total for each species
+speciestotal<-birds_data%>%group_by(species)%>%summarise(count=n())
+
+```
+
+#### **Bird counts and identifications were collected from nine locations on Sewanee's campus. Birds were identified through visuals or vocalizations and then recorded using a shiny data entry app.**
+
+## Column {.tabset data-width="800,"}
+
+### **Map of Observation Locations**
+Map shows the locations of observations along with site specific data. When markers are selected, data on the number of unique species and total number of birds seen is displayed. 
+
+```{r echo=FALSE, fig.height=7}
+totals%>%leaflet()%>%
+  addTiles()%>%
+  setView(lng=-85.9211,lat=35.2031,zoom=14)%>%
+  addMarkers(lat=~lat,lng=~lng,popup=~popup_text)
+```
+
+### **Observation Counts By Species**
+
+```{r fig.height=8, fig.width=7}
+ggplot(speciestotal,aes(y=species,x=count))+geom_bar(stat='identity')+labs(title='Number of Observations of Each Species',caption='displays how many birds within each species across all locations were seen or heard.')+theme_minimal()
+
+```
+
+### **Identification Mode**
+```{r fig.width=8}
+#making data set with summaries of total number of times a bird was id-ed with audio or visuals
+buildingid<-birds_data%>%group_by(identifier,building)%>%summarise(total=n(),.groups = "drop")
+
+#making a grouped bar graph of the toatl number of observations made with each identification method
+ggplot(buildingid,aes(x=building,y=total,fill=identifier))+geom_bar(position='dodge',stat = 'identity')+labs(caption='The number of birds identified at each site by either sight or sound.',x='Building')
+
+```
+
+## Column {data-width="150"}
+
+### **Most Observed Species**
+
+```{r fig.height=8, fig.width=4}
+tt(speciestotal%>%arrange(desc(count))%>%slice(1:5))
+```
+
+### **Total Observations**
+
+```{r fig.height=2}
+tt(total_observations%>%summarise(Total_Overall=sum(total)))
+```
