@@ -14,7 +14,7 @@ library(leaflet)
 library(tinytable)
 ##################### DATA ##################
 #loading in data but not using first row as names 
-birds_data <- read_csv("~/Data & Storytelling/birds_data.csv",
+birds_data <- read_csv("birds_data.csv",
     col_names = FALSE)
 
 #renaming the columns names 
@@ -50,24 +50,32 @@ totals<-merge(totals,locations,by='building')
 #now making a templeate for r to paste into my map as a popup 
 totals$popup_text<-paste0('Location: ', totals$building,'<br/>',
                           'Birds total: ',totals$total,'<br/>',
-                          'Number of species:',totals$n_species,'<br/>')
+                          'Number ofspecies:',totals$n_species,'<br/>')
 # finding the total for each species
 speciestotal<-birds_data%>%group_by(species)%>%summarise(count=n())
 
 ```
 
-#### **Bird counts and identifications were collected from nine locations on Sewanee's campus. Birds were identified through visuals or vocalizations and then recorded using a shiny data entry app.**
+##### **Bird observations were collected across nine locations on Sewanee’s campus to explore how bird communities vary across space. Birds were identified either visually or through vocalizations and recorded using a Shiny data entry app. This dashboard highlights patterns in species presence and detection across Sewanee's campus.**
 
 ## Column {.tabset data-width="800,"}
 
 ### **Map of Observation Locations**
-Map shows the locations of observations along with site specific data. When markers are selected, data on the number of unique species and total number of birds seen is displayed. 
+Map shows the locations of observations along with site specific data. When markers are selected, data on the number of unique species and total number of birds seen is displayed. The color and size of the maker corresponds to the number of species present at that site.
 
 ```{r echo=FALSE, fig.height=7}
+
 totals%>%leaflet()%>%
   addTiles()%>%
-  setView(lng=-85.9211,lat=35.2031,zoom=14)%>%
-  addMarkers(lat=~lat,lng=~lng,popup=~popup_text)
+  setView(lng=-85.9211,lat=35.2031,zoom=14.5)%>%
+  addCircleMarkers(
+    lat = ~lat,
+    lng = ~lng,
+    radius = ~n_species,
+    color = ~colorNumeric(c('lightskyblue','midnightblue'),n_species)(n_species),
+    fillOpacity = 0.9,
+    popup = ~popup_text
+  )
 ```
 
 ### **Observation Counts By Species**
@@ -78,6 +86,7 @@ ggplot(speciestotal,aes(y=species,x=count))+geom_bar(stat='identity')+labs(title
 ```
 
 ### **Identification Mode**
+
 ```{r fig.width=8}
 #making data set with summaries of total number of times a bird was id-ed with audio or visuals
 buildingid<-birds_data%>%group_by(identifier,building)%>%summarise(total=n(),.groups = "drop")
